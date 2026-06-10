@@ -1,0 +1,7 @@
+python-jobspy
+pandas
+openpyxl
+requests
+beautifulsoup4
+rapidfuzz
+pytest
