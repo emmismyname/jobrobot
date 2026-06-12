@@ -29,7 +29,7 @@ ATS_COLUMNS = [
 ]
 
 REQUEST_TIMEOUT_SECONDS = 30
-SUPPORTED_ACTIVE_ATS_TYPES = {"greenhouse", "lever", "ashby"}
+SUPPORTED_ACTIVE_ATS_TYPES = {"greenhouse", "lever", "ashby", "workday"}
 
 
 @dataclass(frozen=True)
@@ -116,7 +116,11 @@ def detect_ats_from_url(url: str) -> tuple[str, str] | None:
         return ("ashby", slug) if slug else None
 
     if "myworkdayjobs.com" in host:
-        site_slug = _slug_from_path(path)
+        parts = [part for part in path.split("/") if part]
+        if "job" in parts:
+            site_slug = "/".join(parts[: parts.index("job")])
+        else:
+            site_slug = parts[0] if parts else ""
         slug = f"{parsed.netloc}/{site_slug}" if site_slug else parsed.netloc
         return ("workday", slug)
 
@@ -313,6 +317,29 @@ def clear_imported_ats_settings(path: Path = config.COMPANY_DB_PATH) -> int:
     return cleared
 
 
+def enable_existing_workday_rows(path: Path = config.COMPANY_DB_PATH) -> int:
+    config.ensure_company_database_columns(path)
+    workbook = load_workbook(path)
+    sheet = workbook[config.COMPANY_SHEET_NAME]
+    headers = _header_map(sheet)
+    enabled = 0
+
+    for row_index in range(2, sheet.max_row + 1):
+        ats_type = str(sheet.cell(row=row_index, column=headers["ATS Type"]).value or "")
+        if ats_type.strip().casefold() != "workday":
+            continue
+        sheet.cell(row=row_index, column=headers["Use Official Scraper"], value="Yes")
+        note_cell = sheet.cell(row=row_index, column=headers["Notes"])
+        existing_note = str(note_cell.value or "").strip()
+        marker = "Workday scraper enabled"
+        if marker not in existing_note:
+            note_cell.value = f"{existing_note}; {marker}".strip("; ")
+        enabled += 1
+
+    workbook.save(path)
+    return enabled
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Import ATS settings from public job-list repos.")
     parser.add_argument(
@@ -342,6 +369,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Clear ATS fields previously written by this importer.",
     )
+    parser.add_argument(
+        "--enable-workday",
+        action="store_true",
+        help="Set Use Official Scraper=Yes for existing Workday rows.",
+    )
     return parser.parse_args()
 
 
@@ -351,6 +383,10 @@ def main() -> dict[str, int]:
         cleared = clear_imported_ats_settings()
         print(f"[ats_importer] Cleared imported ATS settings from {cleared} rows")
         return {"cleared": cleared}
+    if args.enable_workday:
+        enabled = enable_existing_workday_rows()
+        print(f"[ats_importer] Enabled existing Workday rows: {enabled}")
+        return {"enabled_workday": enabled}
 
     source_names = list(SIMPLIFY_SOURCES) if args.source == "all" else [args.source]
     hits = collect_hits(source_names)

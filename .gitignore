@@ -12,7 +12,7 @@ env/
 
 *.log
 log/
+downloads/
 
 .DS_Store
 Thumbs.db
-

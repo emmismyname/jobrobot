@@ -27,6 +27,10 @@ def test_detect_ats_from_common_urls():
         "workday",
         "acme.wd1.myworkdayjobs.com/External",
     )
+    assert detect_ats_from_url("https://intel.wd1.myworkdayjobs.com/en-us/external/job/Engineer_R1") == (
+        "workday",
+        "intel.wd1.myworkdayjobs.com/en-us/external",
+    )
 
 
 def test_parse_ats_hits_from_markdown_table():
@@ -112,6 +116,26 @@ def test_update_company_database_existing_company(tmp_path: Path):
     assert summary["updated"] == 1
     assert sheet.cell(row=2, column=headers["ATS Type"]).value == "greenhouse"
     assert sheet.cell(row=2, column=headers["ATS Company Slug"]).value == "acmesemi"
+    assert sheet.cell(row=2, column=headers["Use Official Scraper"]).value == "Yes"
+
+
+def test_update_company_database_enables_workday_after_scraper_support(tmp_path: Path):
+    db_path = tmp_path / "company_database.xlsx"
+    _create_company_db(db_path)
+    hit = AtsHit(
+        company_name="Acme Semi",
+        ats_type="workday",
+        ats_slug="acme.wd1.myworkdayjobs.com/External",
+        official_job_search_url="https://acme.wd1.myworkdayjobs.com/External/job/Test/Engineer-I_1",
+        source_name="unit",
+    )
+
+    update_company_database([hit], path=db_path)
+
+    workbook = load_workbook(db_path)
+    sheet = workbook["Company_DB"]
+    headers = {cell.value: cell.column for cell in sheet[1]}
+    assert sheet.cell(row=2, column=headers["ATS Type"]).value == "workday"
     assert sheet.cell(row=2, column=headers["Use Official Scraper"]).value == "Yes"
 
 

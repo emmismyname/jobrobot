@@ -48,7 +48,7 @@ flowchart TD
 
     subgraph JobPipeline["Job Alert Pipeline"]
         ATSImport["ats_importer.py<br/>Import ATS hints from public lists"]
-        Official["official_scrapers.py<br/>Greenhouse / Lever / Ashby<br/>Workday TODO"]
+        Official["official_scrapers.py<br/>Greenhouse / Lever / Ashby / Workday"]
         JobSpy["scraper.py<br/>JobSpy Indeed / Google supplemental"]
         Filters["filters.py<br/>Role family + senior/noise filtering"]
         Main["main.py<br/>Combine, score, dedupe"]
@@ -439,8 +439,9 @@ Supported now:
 - Greenhouse: `https://boards-api.greenhouse.io/v1/boards/{slug}/jobs`
 - Lever: `https://api.lever.co/v0/postings/{slug}`
 - Ashby: `https://api.ashbyhq.com/posting-api/job-board/{slug}`
+- Workday public CXS API: `https://{host}/wday/cxs/{tenant}/{site}/jobs`
 
-Workday has a placeholder interface because each company tenant can use a different API path and payload. Add company-specific Workday parsing only after confirming the exact URL.
+Workday support is conservative: it only uses public CXS JSON endpoints derived from `ATS Company Slug` or `Official Job Search URL`. It does not log in, does not bypass access controls, and skips companies whose Workday tenant/site cannot be inferred.
 
 Every job is normalized to:
 
@@ -542,6 +543,15 @@ $env:MAX_EMAIL_JOBS="15"
 python -m src.main
 ```
 
+Workday scraping limits can also be adjusted:
+
+```powershell
+$env:WORKDAY_PAGE_LIMIT="50"
+$env:WORKDAY_MAX_PAGES="3"
+$env:WORKDAY_MAX_DETAILS="50"
+python -m src.main
+```
+
 The scoring favors official sources, then Google, then Indeed/LinkedIn. It strongly penalizes senior, staff, principal, manager, director, Engineer III/IV, postdoc, PhD-required, civil, highway, structural, forensic, and Korean-bilingual-only roles.
 
 ## GitHub Actions Setup
@@ -610,7 +620,7 @@ Official Job Search URL
 Use Official Scraper
 ```
 
-Workday, SmartRecruiters, and iCIMS are intentionally not hard-coded yet because they vary by tenant. Add them as explicit per-company integrations once the public endpoint is confirmed.
+SmartRecruiters and iCIMS are intentionally not hard-coded yet because they vary by tenant. Add them as explicit per-company integrations once the public endpoint is confirmed.
 
 ## Push to GitHub
 
